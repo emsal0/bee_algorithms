@@ -138,8 +138,8 @@ class AlgoStrategy(gamelib.AlgoCore):
         destructors_points = [[6, 10], [7, 10], [20, 10], [21, 10]]
         filters_points = [[3, 13], [24, 13], [4, 12], [23, 12], [5, 11], [6, 11], [7, 11], [20, 11], [21, 11], [22, 11]]
 
-        self.attempt_spawn(game_state, DESTRUCTOR, destructors_points)
-        self.attempt_spawn(game_state, FILTER, filters_points)
+        game_state.attempt_spawn(game_state, DESTRUCTOR, destructors_points)
+        game_state.attempt_spawn(game_state, FILTER, filters_points)
 
     def build_initial_defences(self, game_state):
         destructor_points = [[2, 13], [3, 13], [24, 13], [25, 13], [3, 12], [6, 12], [7, 12], [20, 12], [21, 12], [24, 12], [7, 11], [8, 11], [19, 11], [20, 11], [11, 9], [12, 9], [13, 9], [14, 9], [15, 9], [16, 9]]
