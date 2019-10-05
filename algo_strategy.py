@@ -78,29 +78,34 @@ class AlgoStrategy(gamelib.AlgoCore):
         self.build_initial_defences(game_state)
         self.build_defences(game_state)
         # Now build reactive defenses based on where the enemy scored
-        self.build_reactive_defense(game_state)
+        #self.build_reactive_defense(game_state)
 
         action = self.determine_action(game_state)
+        gamelib.debug_write("action is " + str(action))
 
         # If we are defending build scramblers to defend
-        if action == 1:
+        if action == 0:
             self.stall_with_scramblers(game_state)
         # If we are attacking
         elif action == 2:
+            gamelib.debug_write("attacking...")
             ping_spawn_location_options = []
             if self.orientation == 'left':
-                ping_spawn_location_options = [[1,12],[2,12]]
+                ping_spawn_location_options = [[4,9],[5,8]]
             elif self.orientation == 'right':
-                ping_spawn_location_options = [[25,12],[26,12]]
+                ping_spawn_location_options = [[23,9],[22,8]]
 
             best_location = ping_spawn_location_options[0] # self.least_damage_spawn_location(game_state, ping_spawn_location_options)
             best_path = game_state.find_path_to_edge(best_location)
 
-            end_node = best_path[-1]
-
-            can_go = ( abs(end_node[0] - best_location[0]) > 13 )
-            if can_go:
+            if best_path is not None:
+                gamelib.debug_write("selecting location " + str(best_location))
+                game_state.attempt_spawn(EMP, best_location, 3)
                 game_state.attempt_spawn(PING, best_location, 1000)
+            if best_path is None:
+                gamelib.debug_write("selecting location" + str(ping_spawn_location_options[0]))
+                game_state.attempt_spawn(EMP, ping_spawn_location_options[0], 2)
+                game_state.attempt_spawn(PING, ping_spawn_location_options[0], 1000)
 
 
 
@@ -172,8 +177,12 @@ class AlgoStrategy(gamelib.AlgoCore):
         """
         Send out Scramblers at random locations to defend our base from enemy moving units.
         """
-        deploy_locations = [[8, 5], [19,5]]
-        game_state.attempt_spawn(SCRAMBLER, deploy_locations)
+
+        if self.orientation == 'left':
+            deploy_locations = [[19, 5]]
+        elif self.orientation == 'right':
+            deploy_locations = [[8, 5]]
+        game_state.attempt_spawn(SCRAMBLER, deploy_locations, 2)
 
     def emp_line_strategy(self, game_state):
         """
@@ -235,13 +244,16 @@ class AlgoStrategy(gamelib.AlgoCore):
     # determine whether we should attack, defend, or stall
     def determine_action(self, game_state):
         # attack when we only gain less than 2 additional bits
-        if game_state.get_resource(game_state.BITS, player_index=0) - game_state.project_future_bits() < 2:
-            return 2 # 2 is attack
+        gamelib.debug_write("player has " + str(game_state.get_resource(game_state.BITS, player_index=0)) + " bits")
+        gamelib.debug_write("player has " + str(game_state.get_resource(game_state.BITS, player_index=1)) + " bits")
+
+        if game_state.get_resource(game_state.BITS, player_index=0) >= 15:
+            return 2
         # otherwise defend if opponent gains less than 2 additional bits
-        elif game_state.get_resource(game_state.BITS, player_index=1) - game_state.project_future_bits(player_index=1) < 2:
+        elif game_state.get_resource(game_state.BITS, player_index=1) >= 15:
             return 0
-        # otherwise save bits
-        return 1
+        else:
+            return 1
 
 
 
