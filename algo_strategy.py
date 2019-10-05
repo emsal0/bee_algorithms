@@ -87,11 +87,13 @@ class AlgoStrategy(gamelib.AlgoCore):
             self.stall_with_scramblers(game_state)
         # If we are attacking
         elif action == 2:
+            ping_spawn_location_options = []
             if self.orientation == 'left':
                 ping_spawn_location_options = [[1,12],[2,12]]
             elif self.orientation == 'right':
                 ping_spawn_location_options = [[25,12],[26,12]]
-            best_location = self.least_damage_spawn_location(game_state, ping_spawn_location_options)
+
+            best_location = ping_spawn_location_options[0] # self.least_damage_spawn_location(game_state, ping_spawn_location_options)
             best_path = game_state.find_path_to_edge(best_location)
 
             end_node = best_path[-1]
@@ -233,10 +235,10 @@ class AlgoStrategy(gamelib.AlgoCore):
     # determine whether we should attack, defend, or stall
     def determine_action(self, game_state):
         # attack when we only gain less than 2 additional bits
-        if game_state.get_resource(game_state.bits, player_index=0) - game_state.project_future_bits() < 2:
+        if game_state.get_resource(game_state.BITS, player_index=0) - game_state.project_future_bits() < 2:
             return 2 # 2 is attack
         # otherwise defend if opponent gains less than 2 additional bits
-        elif game_state.get_resource(game_state.bits, player_index=1) - game_state.project_future_bits(player_index=1) < 2:
+        elif game_state.get_resource(game_state.BITS, player_index=1) - game_state.project_future_bits(player_index=1) < 2:
             return 0
         # otherwise save bits
         return 1
