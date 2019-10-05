@@ -24,6 +24,7 @@ class AlgoStrategy(gamelib.AlgoCore):
         super().__init__()
         seed = random.randrange(maxsize)
         random.seed(seed)
+        self.orientation = random.choice(['right', 'left'])
         gamelib.debug_write('Random seed: {}'.format(seed))
 
     def on_game_start(self, config):
@@ -41,9 +42,6 @@ class AlgoStrategy(gamelib.AlgoCore):
         SCRAMBLER = config["unitInformation"][5]["shorthand"]
         # This is a good place to do initial setup
         self.scored_on_locations = []
-
-    
-        
 
     def on_turn(self, turn_state):
         """
@@ -76,13 +74,17 @@ class AlgoStrategy(gamelib.AlgoCore):
         If there are no stationary units to attack in the front, we will send Pings to try and score quickly.
         """
         # First, place basic defenses
+        self.build_blocker_points(game_state)
+        self.build_initial_defences(game_state)
         self.build_defences(game_state)
         # Now build reactive defenses based on where the enemy scored
         self.build_reactive_defense(game_state)
 
         # If the turn is less than 5, stall with Scramblers and wait to see enemy's base
-        if game_state.turn_number < 5:
-            self.stall_with_scramblers(game_state)
+        if game_state.turn_number < 0:
+            pass
+            # self.stall_with_scramblers(game_state)
+            # self.build_initial_defences(game_state)
         else:
             # Now let's analyze the enemy base to see where their defenses are concentrated.
             # If they have many units in the front we can build a line for our EMPs to attack them at long range.
@@ -93,15 +95,36 @@ class AlgoStrategy(gamelib.AlgoCore):
 
                 # Only spawn Ping's every other turn
                 # Sending more at once is better since attacks can only hit a single ping at a time
-                if game_state.turn_number % 2 == 1:
-                    # To simplify we will just check sending them from back left and right
-                    ping_spawn_location_options = [[13, 0], [14, 0]]
-                    best_location = self.least_damage_spawn_location(game_state, ping_spawn_location_options)
+                if self.orientation == 'left':
+                    ping_spawn_location_options = [[1,12],[2,12]]
+                elif self.orientation == 'right':
+                    ping_spawn_location_options = [[25,12],[26,12]]
+                best_location = self.least_damage_spawn_location(game_state, ping_spawn_location_options)
+                best_path = game_state.find_path_to_edge(best_location)
+
+                end_node = best_path[-1]
+
+                can_go = ( abs(end_node[0] - best_location[0]) > 13 )
+                if can_go:
                     game_state.attempt_spawn(PING, best_location, 1000)
 
                 # Lastly, if we have spare cores, let's build some Encryptors to boost our Pings' health.
-                encryptor_locations = [[13, 2], [14, 2], [13, 3], [14, 3]]
-                game_state.attempt_spawn(ENCRYPTOR, encryptor_locations)
+                # encryptor_locations = [[13, 2], [14, 2], [13, 3], [14, 3]]
+                # game_state.attempt_spawn(ENCRYPTOR, encryptor_locations)
+
+    def build_blocker_points(self, game_state):
+        blocker_points = []
+
+        if self.orientation == 'right':
+            blocker_points = [[26,13],[27,13]]
+        elif self.orientation == 'left':
+            blocker_points = [[0,13],[1,13]]
+
+        game_state.attempt_spawn(ENCRYPTOR, blocker_points)
+
+    def build_initial_defences(self, game_state):
+        destructor_points = [[2, 13], [3, 13], [24, 13], [25, 13], [3, 12], [6, 12], [7, 12], [20, 12], [21, 12], [24, 12], [7, 11], [8, 11], [19, 11], [20, 11], [11, 9], [12, 9], [13, 9], [14, 9], [15, 9], [16, 9]]
+        game_state.attempt_spawn(DESTRUCTOR, destructor_points)
 
     def build_defences(self, game_state):
         """
@@ -111,14 +134,22 @@ class AlgoStrategy(gamelib.AlgoCore):
         # Useful tool for setting up your base locations: https://www.kevinbai.design/terminal-map-maker
         # More community tools available at: https://terminal.c1games.com/rules#Download
 
-        # Place destructors that attack enemy units
-        destructor_locations = [[0, 13], [27, 13], [8, 11], [19, 11], [13, 11], [14, 11]]
-        # attempt_spawn will try to spawn units if we have resources, and will check if a blocking unit is already there
-        game_state.attempt_spawn(DESTRUCTOR, destructor_locations)
+        priority_points = [[2, 13], [25, 13], [3, 12], [24, 12], [4, 11], [23, 11], [5, 10], [22, 10], [6, 9], [21, 9], [7, 8], [20, 8], [8, 7], [19, 7], [9, 6], [18, 6], [10, 5], [17, 5], [11, 4], [16, 4], [12, 3], [15, 3], [13, 2], [14, 2]]
+
+        game_state.attempt_spawn(ENCRYPTOR, priority_points)
+
+        lesser_points = [[3, 13], [24, 13], [4, 12], [23, 12], [5, 11], [22, 11], [6, 10], [21, 10], [7, 9], [20, 9], [8, 8], [19, 8], [9, 7], [18, 7], [10, 6], [17, 6], [11, 5], [16, 5], [12, 4], [15, 4], [13, 3], [14, 3]]
+        game_state.attempt_spawn(ENCRYPTOR, lesser_points)
         
-        # Place filters in front of destructors to soak up damage for them
-        filter_locations = [[8, 12], [19, 12]]
-        game_state.attempt_spawn(FILTER, filter_locations)
+
+        # Place destructors that attack enemy units
+        # destructor_locations = [[0, 13], [27, 13], [8, 11], [19, 11], [13, 11], [14, 11]]
+        # # attempt_spawn will try to spawn units if we have resources, and will check if a blocking unit is already there
+        # game_state.attempt_spawn(DESTRUCTOR, destructor_locations)
+        # 
+        # # Place filters in front of destructors to soak up damage for them
+        # filter_locations = [[8, 12], [19, 12]]
+        # game_state.attempt_spawn(FILTER, filter_locations)
 
     def build_reactive_defense(self, game_state):
         """
