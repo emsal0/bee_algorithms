@@ -80,37 +80,41 @@ class AlgoStrategy(gamelib.AlgoCore):
         # Now build reactive defenses based on where the enemy scored
         self.build_reactive_defense(game_state)
 
-        # If the turn is less than 5, stall with Scramblers and wait to see enemy's base
-        if game_state.turn_number < 0:
-            pass
-            # self.stall_with_scramblers(game_state)
-            # self.build_initial_defences(game_state)
-        else:
-            # Now let's analyze the enemy base to see where their defenses are concentrated.
-            # If they have many units in the front we can build a line for our EMPs to attack them at long range.
-            if self.detect_enemy_unit(game_state, unit_type=None, valid_x=None, valid_y=[14, 15]) > 10:
-                self.emp_line_strategy(game_state)
-            else:
-                # They don't have many units in the front so lets figure out their least defended area and send Pings there.
+        action = self.determine_action(game_state)
 
-                # Only spawn Ping's every other turn
-                # Sending more at once is better since attacks can only hit a single ping at a time
-                if self.orientation == 'left':
-                    ping_spawn_location_options = [[1,12],[2,12]]
-                elif self.orientation == 'right':
-                    ping_spawn_location_options = [[25,12],[26,12]]
-                best_location = self.least_damage_spawn_location(game_state, ping_spawn_location_options)
-                best_path = game_state.find_path_to_edge(best_location)
+        # If we are defending build scramblers to defend
+        if action == 1:
+            self.stall_with_scramblers(game_state)
+        # If we are attacking
+        elif action == 2:
+            if self.orientation == 'left':
+                ping_spawn_location_options = [[1,12],[2,12]]
+            elif self.orientation == 'right':
+                ping_spawn_location_options = [[25,12],[26,12]]
+            best_location = self.least_damage_spawn_location(game_state, ping_spawn_location_options)
+            best_path = game_state.find_path_to_edge(best_location)
 
-                end_node = best_path[-1]
+            end_node = best_path[-1]
 
-                can_go = ( abs(end_node[0] - best_location[0]) > 13 )
-                if can_go:
-                    game_state.attempt_spawn(PING, best_location, 1000)
+            can_go = ( abs(end_node[0] - best_location[0]) > 13 )
+            if can_go:
+                game_state.attempt_spawn(PING, best_location, 1000)
 
-                # Lastly, if we have spare cores, let's build some Encryptors to boost our Pings' health.
-                # encryptor_locations = [[13, 2], [14, 2], [13, 3], [14, 3]]
-                # game_state.attempt_spawn(ENCRYPTOR, encryptor_locations)
+
+
+        # Now let's analyze the enemy base to see where their defenses are concentrated.
+        # If they have many units in the front we can build a line for our EMPs to attack them at long range.
+        #if self.detect_enemy_unit(game_state, unit_type=None, valid_x=None, valid_y=[14, 15]) > 10:
+        #    self.emp_line_strategy(game_state)
+        #else:
+            # They don't have many units in the front so lets figure out their least defended area and send Pings there.
+
+            # Only spawn Ping's every other turn
+            # Sending more at once is better since attacks can only hit a single ping at a time
+
+            # Lastly, if we have spare cores, let's build some Encryptors to boost our Pings' health.
+            # encryptor_locations = [[13, 2], [14, 2], [13, 3], [14, 3]]
+            # game_state.attempt_spawn(ENCRYPTOR, encryptor_locations)
 
     def build_blocker_points(self, game_state):
         blocker_points = []
@@ -166,24 +170,8 @@ class AlgoStrategy(gamelib.AlgoCore):
         """
         Send out Scramblers at random locations to defend our base from enemy moving units.
         """
-        # We can spawn moving units on our edges so a list of all our edge locations
-        friendly_edges = game_state.game_map.get_edge_locations(game_state.game_map.BOTTOM_LEFT) + game_state.game_map.get_edge_locations(game_state.game_map.BOTTOM_RIGHT)
-        
-        # Remove locations that are blocked by our own firewalls 
-        # since we can't deploy units there.
-        deploy_locations = self.filter_blocked_locations(friendly_edges, game_state)
-        
-        # While we have remaining bits to spend lets send out scramblers randomly.
-        while game_state.get_resource(game_state.BITS) >= game_state.type_cost(SCRAMBLER) and len(deploy_locations) > 0:
-            # Choose a random deploy location.
-            deploy_index = random.randint(0, len(deploy_locations) - 1)
-            deploy_location = deploy_locations[deploy_index]
-            
-            game_state.attempt_spawn(SCRAMBLER, deploy_location)
-            """
-            We don't have to remove the location since multiple information 
-            units can occupy the same space.
-            """
+        deploy_locations = [[8, 5], [19,5]]
+        game_state.attempt_spawn(SCRAMBLER, deploy_locations)
 
     def emp_line_strategy(self, game_state):
         """
@@ -241,6 +229,19 @@ class AlgoStrategy(gamelib.AlgoCore):
             if not game_state.contains_stationary_unit(location):
                 filtered.append(location)
         return filtered
+
+    # determine whether we should attack, defend, or stall
+    def determine_action(self, game_state):
+        # attack when we only gain less than 2 additional bits
+        if game_state.get_resource(game_state.bits, player_index=0) - game_state.project_future_bits() < 2:
+            return 2 # 2 is attack
+        # otherwise defend if opponent gains less than 2 additional bits
+        elif game_state.get_resource(game_state.bits, player_index=1) - game_state.project_future_bits(player_index=1) < 2:
+            return 0
+        # otherwise save bits
+        return 1
+
+
 
     def on_action_frame(self, turn_string):
         """
